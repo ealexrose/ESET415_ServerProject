@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import os
 import tqdm
+import hashlib
 
 # This is udpserver.py file
 import socket                                         
@@ -32,8 +33,8 @@ def PutFile():
    # Receive the data of 4096 bytes maximum. Need to use recvfrom because there is not tcp connecction
    data, addr = serversocket.recvfrom(bufferSize)
    receivedPacket = data.decode()
-   fileName, fileSize = receivedPacket.split(seperator)
-   print(f"Recieving {fileName} size of {fileSize}")
+   fileName, fileSize, fileHash = receivedPacket.split(seperator)
+   print(f"\nRecieving {fileName} size of {fileSize}\n hash is {fileHash}\n")
    filePath = os.path.join(fullPath,fileName)
    writtenFileSize = 0
    serversocket.sendto("recieved".encode(), addr)
@@ -54,7 +55,20 @@ def PutFile():
             fileSize = os.path.getsize(filePath)
             print(f"Upload Completed of {fileName} size on disk is {fileSize} \n")
             print("finished")
+            f.close()
             break
+    fo = open(filePath,"rb")
+    data = fo.read()
+
+    #check hash
+    hash_object = hashlib.sha384(data)
+    hash_digest = hash_object.hexdigest()
+
+    if(hash_digest == fileHash):
+        print(f"{hash_digest}\nhashes match\n")
+    else:
+        print(f"{hash_digest}\n!!hash mismatch!!\n")
+    fo.close()
 
 def GetFile():
     #Get name of requested file
@@ -64,10 +78,17 @@ def GetFile():
     filePath = os.path.join(fullPath,fileName)
     if(os.path.exists(filePath)):
         fileSize = os.path.getsize(filePath)
-        print(f"Starting upload of {fileName} with a size off {fileSize}")
+
+        fo = open(filePath,"rb")
+        data = fo.read()
+        #check hash
+        hash_object = hashlib.sha384(data)
+        hash_digest = hash_object.hexdigest()
+        fo.close()
 
         #send back file name and file size to client
-        serversocket.sendto(f"{fileName}{seperator}{fileSize}".encode(),addr)
+        print(f"Starting upload of {fileName} with a size off {fileSize}\n hash is\n{hash_digest}")   
+        serversocket.sendto(f"{fileName}{seperator}{fileSize}{seperator}{hash_digest}".encode(),addr)
     else:
         print(f"{fileName}does not exist or cannot be found")
         return

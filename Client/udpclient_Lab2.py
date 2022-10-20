@@ -1,4 +1,5 @@
 from dis import Instruction
+import hashlib
 import os
 import tqdm
 
@@ -36,16 +37,29 @@ fullPath = os.path.join(absolutePath,relativePath)
 
 def PutFile(fileName):
     filePath = os.path.join(fullPath,fileName)
+    fileExists = False
     if(os.path.exists(filePath)):
-        fileSize = os.path.getsize(filePath)
+
+        fo = open(filePath,"rb")
+        data = fo.read()
+        #check hash
+        hash_object = hashlib.sha384(data)
+        hash_digest = hash_object.hexdigest()
+
+        print(f"\n checksum is\n {hash_digest}\n")
+        fo.close()
+
+        fileSize = os.path.getsize(filePath)       
         print(f"Starting upload of {fileName} with a size off {fileSize}")
+        fileExists = True
     else:
         print(f"{fileName}does not exist or cannot be found")
         return
     
     #Send Header Data
-    s.sendto("UploadToServer".encode(),serverAddr)
-    s.sendto(f"{fileName}{seperator}{fileSize}".encode(),serverAddr)
+    if(fileExists):
+        s.sendto("UploadToServer".encode(),serverAddr)
+        s.sendto(f"{fileName}{seperator}{fileSize}{seperator}{hash_digest}".encode(),serverAddr)
 
     #Get acknowledgement that setup is complete
     s.recvfrom(bufferSize)
@@ -76,7 +90,7 @@ def GetFile(fileName):
     #recieve Header Data, file name and file size from server
     headerBinary, addr = s.recvfrom(bufferSize)
     headerInfo = headerBinary.decode()
-    fileName, fileSize = headerInfo.split(seperator)
+    fileName, fileSize, fileHash = headerInfo.split(seperator)
 
     print(f"Recieving {fileName} size of {fileSize}")
     filePath = os.path.join(fullPath,fileName)
@@ -102,6 +116,20 @@ def GetFile(fileName):
                 # file transmitting is done
                 fileSize = os.path.getsize(filePath)
                 print(f"Download Completed of {fileName} size on disk is {fileSize} \n")
+                f.close()
+
+                fo = open(filePath, "rb")
+                data = fo.read()
+                #check hash
+                hash_object = hashlib.sha384(data)
+                hash_digest = hash_object.hexdigest()
+
+                if(hash_digest == fileHash):
+                    print(f"{hash_digest}\nhashes match\n")
+                else:
+                    print(f"{hash_digest}\n!!hash mismatch!!\n")
+                fo.close()
+
                 break    
 
 
