@@ -68,7 +68,7 @@ def PutFile():
    print("Waiting to receive an instruction on port " + str(port) + '\n')
 
    # Receive the data of 4096 bytes maximum. Need to use recvfrom because there is not tcp connecction(1)
-   data, addr = serversocket.recvfrom(bufferSize)
+   data, addr = RecvEncrypted()
    receivedPacket = data.decode()
    fileName, fileSize, fileHash = receivedPacket.split(seperator)
    print(f"\nRecieving {fileName} size of {fileSize}\n hash is {fileHash}\n")
@@ -76,18 +76,20 @@ def PutFile():
    writtenFileSize = 0
    
    #confirm initial setup (2)
-   serversocket.sendto("recieved".encode(), addr)
+   SendEncrypted("recieved".encode())
    #progress = tqdm.tqdm(range(int(fileSize)), f"Recieving {fileName}", unit="B", unit_scale=True, unit_divisor=1024)
    with open(filePath, "wb") as f:
     while True:
         # read bufferSize bytes from the socket (3)
-        bytes_read, addr = serversocket.recvfrom(bufferSize)
+        bytes_read, addr = RecvEncrypted()
 
         # write to the file the bytes we just received
         f.write(bytes_read)
         
         writtenFileSize = writtenFileSize + len(bytes_read)
-        serversocket.sendto("recieved".encode(), addr)
+        #send received signal (4)
+        SendEncrypted("recieved".encode())
+        
         #progress.update(len(bytes_read))
         if writtenFileSize >= int(fileSize):    
             # nothing is received

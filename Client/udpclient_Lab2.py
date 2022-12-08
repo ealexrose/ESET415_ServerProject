@@ -85,28 +85,28 @@ def PutFile(fileName):
         #Initial Command (0)
         s.sendto("UploadToServer".encode(),serverAddr)
         #Send name of uploaded file (1)
-        s.sendto(f"{fileName}{seperator}{fileSize}{seperator}{hash_digest}".encode(),serverAddr)
+        SendEncrypted(f"{fileName}{seperator}{fileSize}{seperator}{hash_digest}".encode())
     else:
         print("File does not exist or cannot be found")
         return
     #Get acknowledgement that setup is complete (2)
-    s.recvfrom(bufferSize)
+    RecvEncrypted()
 
     #progress = tqdm.tqdm(range(fileSize), f"Sending {fileName}", unit="B", unit_scale=True, unit_divisor=1024)
     
     with open(filePath, "rb") as f:
         while True:
             # read the bytes from the file
-            bytes_read = f.read(bufferSize)
+            bytes_read = f.read(1024)
             if not bytes_read:
                 # file transmitting is done
                 break
             # busy networks (3)
-            s.sendto(bytes_read,serverAddr)
+            SendEncrypted(bytes_read)
             #progress.update(len(bytes_read))
             
             # get confirmation that message was received (4)
-            s.recvfrom(bufferSize)
+            RecvEncrypted()
     print("Transfer complete")
 
 def GetFile(fileName):
