@@ -67,24 +67,27 @@ def RecvEncrypted():
 def PutFile():
    print("Waiting to receive an instruction on port " + str(port) + '\n')
 
-   # Receive the data of 4096 bytes maximum. Need to use recvfrom because there is not tcp connecction
+   # Receive the data of 4096 bytes maximum. Need to use recvfrom because there is not tcp connecction(1)
    data, addr = serversocket.recvfrom(bufferSize)
    receivedPacket = data.decode()
    fileName, fileSize, fileHash = receivedPacket.split(seperator)
    print(f"\nRecieving {fileName} size of {fileSize}\n hash is {fileHash}\n")
    filePath = os.path.join(fullPath,fileName)
    writtenFileSize = 0
+   
+   #confirm initial setup (2)
    serversocket.sendto("recieved".encode(), addr)
    #progress = tqdm.tqdm(range(int(fileSize)), f"Recieving {fileName}", unit="B", unit_scale=True, unit_divisor=1024)
    with open(filePath, "wb") as f:
     while True:
-        # read bufferSize bytes from the socket (receive)
+        # read bufferSize bytes from the socket (3)
         bytes_read, addr = serversocket.recvfrom(bufferSize)
 
         # write to the file the bytes we just received
         f.write(bytes_read)
         
         writtenFileSize = writtenFileSize + len(bytes_read)
+        serversocket.sendto("recieved".encode(), addr)
         #progress.update(len(bytes_read))
         if writtenFileSize >= int(fileSize):    
             # nothing is received
@@ -143,14 +146,14 @@ def GetFile():
         serversocket.sendto(f"{fileName}{seperator}{fileSize}{seperator}{hash_digest}".encode(),addr)
         
     else:
+        #send back error (2)
         print(f"{fileName} does not exist or cannot be found")
         serversocket.sendto(f"{fileName}{seperator}-1{seperator}-1".encode(),addr)
-        
-        #send back error (2)
         return
     
-    #Get acknowledgement that setup is complete
+    #Get acknowledgement that setup is complete (3)
     serversocket.recvfrom(bufferSize)
+    
     #progress = tqdm.tqdm(range(fileSize), f"Sending {fileName}", unit="B", unit_scale=True, unit_divisor=1024)
     
     with open(filePath, "rb") as f:
@@ -160,11 +163,11 @@ def GetFile():
             if not bytes_read:
                 # file transmitting is done
                 break
-            # busy networks
+            # busy networks (4)
             serversocket.sendto(bytes_read,addr)
             #progress.update(len(bytes_read))
             
-            #Get acknowledgement that buffer was received
+            #Get acknowledgement that buffer was received (5)
             serversocket.recvfrom(bufferSize)
     print("\nTransfer complete\n")
 

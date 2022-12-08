@@ -82,10 +82,14 @@ def PutFile(fileName):
     
     #Send Header Data
     if(fileExists):
+        #Initial Command (0)
         s.sendto("UploadToServer".encode(),serverAddr)
+        #Send name of uploaded file (1)
         s.sendto(f"{fileName}{seperator}{fileSize}{seperator}{hash_digest}".encode(),serverAddr)
-
-    #Get acknowledgement that setup is complete
+    else:
+        print("File does not exist or cannot be found")
+        return
+    #Get acknowledgement that setup is complete (2)
     s.recvfrom(bufferSize)
 
     #progress = tqdm.tqdm(range(fileSize), f"Sending {fileName}", unit="B", unit_scale=True, unit_divisor=1024)
@@ -97,9 +101,12 @@ def PutFile(fileName):
             if not bytes_read:
                 # file transmitting is done
                 break
-            # busy networks
+            # busy networks (3)
             s.sendto(bytes_read,serverAddr)
             #progress.update(len(bytes_read))
+            
+            # get confirmation that message was received (4)
+            s.recvfrom(bufferSize)
     print("Transfer complete")
 
 def GetFile(fileName):
@@ -125,14 +132,14 @@ def GetFile(fileName):
     filePath = os.path.join(fullPath,fileName)
     writtenFileSize = 0
 
-    #send acknowledgement that setup is complete
+    #send acknowledgement that setup is complete (3)
     s.sendto("recieved".encode(), addr)
 
     #progress = tqdm.tqdm(range(int(fileSize)), f"Recieving {fileName}", unit="B", unit_scale=True, unit_divisor=1024)
     
     with open(filePath, "wb") as f:
         while True:
-            # read bufferSize bytes from the socket (receive)
+            # read bufferSize bytes from the socket (4)
             bytes_read, addr = s.recvfrom(bufferSize)
 
             # write to the file the bytes we just received
@@ -140,7 +147,7 @@ def GetFile(fileName):
             
             writtenFileSize = writtenFileSize + len(bytes_read)
             
-            #send acknowledgement
+            #send acknowledgement (5)
             s.sendto(f"buffer received{writtenFileSize}".encode(),serverAddr)
             
             # progress.update(len(bytes_read))
