@@ -141,34 +141,34 @@ def GetFile():
         fo.close()
 
         #send back file name, size, and hash to client (2)
-        print(f"Starting upload of {fileName} with a size off {fileSize}\n hash is\n{hash_digest}")
-        
-        serversocket.sendto(f"{fileName}{seperator}{fileSize}{seperator}{hash_digest}".encode(),addr)
+        print(f"Starting upload of {fileName} with a size off {fileSize}\n hash is\n{hash_digest}")   
+        SendEncrypted(f"{fileName}{seperator}{fileSize}{seperator}{hash_digest}".encode())
         
     else:
         #send back error (2)
-        print(f"{fileName} does not exist or cannot be found")
-        serversocket.sendto(f"{fileName}{seperator}-1{seperator}-1".encode(),addr)
+        print(f"{fileName} does not exist or cannot be found")  
+        SendEncrypted(f"{fileName}{seperator}-1{seperator}-1".encode())
+        
         return
     
     #Get acknowledgement that setup is complete (3)
-    serversocket.recvfrom(bufferSize)
+    RecvEncrypted()
     
     #progress = tqdm.tqdm(range(fileSize), f"Sending {fileName}", unit="B", unit_scale=True, unit_divisor=1024)
     
     with open(filePath, "rb") as f:
         while True:
             # read the bytes from the file
-            bytes_read = f.read(bufferSize)
+            bytes_read = f.read(1024)
             if not bytes_read:
                 # file transmitting is done
                 break
             # busy networks (4)
-            serversocket.sendto(bytes_read,addr)
+            SendEncrypted(bytes_read)
             #progress.update(len(bytes_read))
             
             #Get acknowledgement that buffer was received (5)
-            serversocket.recvfrom(bufferSize)
+            RecvEncrypted()
     print("\nTransfer complete\n")
 
 

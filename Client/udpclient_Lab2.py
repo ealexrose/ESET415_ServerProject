@@ -120,7 +120,7 @@ def GetFile(fileName):
     #s.sendto(f"{fileName}".encode(),serverAddr)
 
     #recieve Header Data, file name and file size from server (2)
-    headerBinary, addr = s.recvfrom(bufferSize)
+    headerBinary, addr = RecvEncrypted()
     headerInfo = headerBinary.decode()
     fileName, fileSize, fileHash = headerInfo.split(seperator)
     
@@ -133,14 +133,14 @@ def GetFile(fileName):
     writtenFileSize = 0
 
     #send acknowledgement that setup is complete (3)
-    s.sendto("recieved".encode(), addr)
+    SendEncrypted("received".encode())
 
     #progress = tqdm.tqdm(range(int(fileSize)), f"Recieving {fileName}", unit="B", unit_scale=True, unit_divisor=1024)
     
     with open(filePath, "wb") as f:
         while True:
             # read bufferSize bytes from the socket (4)
-            bytes_read, addr = s.recvfrom(bufferSize)
+            bytes_read, addr = RecvEncrypted()
 
             # write to the file the bytes we just received
             f.write(bytes_read)
@@ -148,8 +148,8 @@ def GetFile(fileName):
             writtenFileSize = writtenFileSize + len(bytes_read)
             
             #send acknowledgement (5)
-            s.sendto(f"buffer received{writtenFileSize}".encode(),serverAddr)
-            
+            SendEncrypted(f"buffer received{writtenFileSize}".encode())
+            print(f"{writtenFileSize}/{fileSize}")
             # progress.update(len(bytes_read))
             if writtenFileSize >= int(fileSize):    
                 # nothing is received
