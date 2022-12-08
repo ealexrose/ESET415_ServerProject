@@ -1,20 +1,18 @@
-from dis import Instruction
 import hashlib
 import os
-import tqdm
+#import tqdm
 
 # This is udpclient.py file
 
 #Import socket programming module
 import socket
-from symbol import argument
-from unittest import case
-
+import pickle
+from Knapsack import encrypt, decrypt, knapSum
 # Create a socket object
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) 
 
 # Set destination port
-port = 65432
+port = 65433
 
 # Include the server Address 
 serverAddr = ('127.0.0.1', port)
@@ -30,10 +28,36 @@ relativePath = "FileBin"
 fullPath = os.path.join(absolutePath,relativePath)
 #fileName = "lab10_test_data-2.csv"
 
+superincreasing = [2, 7, 11, 21, 42, 89, 180, 354]
+n = 588
+m = 881
+inverseModulus = pow(n,-1,m)
+clientPublicKey =[]
+for i in range(len(superincreasing)):
+    clientPublicKey.append((superincreasing[i] * n) % m)
+print("Sending key on port " + str(port) + '\n')    
+clientPublicKey_bin = pickle.dumps(clientPublicKey)
+print(clientPublicKey_bin)
+s.sendto(clientPublicKey_bin, serverAddr)
+print("Sent client's public key\n")
+msg, addr = s.recvfrom(bufferSize)
+print(addr)
+serverPublicKey_bin = msg
+print("Server's public key received: ", serverPublicKey_bin)
+serverPublicKey = pickle.loads(serverPublicKey_bin)
+print("Server's public key list:", serverPublicKey)
 
-# Send message. The string needs to be converted to bytes.
-# To send more than one message, please create a loop
 
+def SendEncrypted(messageToSend):
+    encryptedMessage = encrypt(messageToSend,serverPublicKey)
+    encryptedMessage_bin = pickle.dumps(encryptedMessage)
+    s.sendto(encryptedMessage_bin, addr)
+
+def RecvEncrypted():
+    data, addr = s.recvfrom(bufferSize)
+    decryptedMessage_bin = pickle.loads(data)
+    decryptedMessage = decrypt(decryptedMessage_bin, superincreasing, m, inverseModulus)
+    return decryptedMessage, addr
 
 def PutFile(fileName):
     filePath = os.path.join(fullPath,fileName)
@@ -64,7 +88,7 @@ def PutFile(fileName):
     #Get acknowledgement that setup is complete
     s.recvfrom(bufferSize)
 
-    progress = tqdm.tqdm(range(fileSize), f"Sending {fileName}", unit="B", unit_scale=True, unit_divisor=1024)
+    #progress = tqdm.tqdm(range(fileSize), f"Sending {fileName}", unit="B", unit_scale=True, unit_divisor=1024)
     
     with open(filePath, "rb") as f:
         while True:
@@ -75,22 +99,27 @@ def PutFile(fileName):
                 break
             # busy networks
             s.sendto(bytes_read,serverAddr)
-            progress.update(len(bytes_read))
+            #progress.update(len(bytes_read))
     print("Transfer complete")
 
 def GetFile(fileName):
 
     print(f"Requesting file {fileName} from the server")
     #Send Header Data
-    #Initial Command
+    #Initial Command (0)
     s.sendto("DownloadFromServer".encode(),serverAddr)
-    #Send name of requested File
-    s.sendto(f"{fileName}".encode(),serverAddr)
+    #Send name of requested File (1)
+    SendEncrypted(f"{fileName}".encode())
+    #s.sendto(f"{fileName}".encode(),serverAddr)
 
-    #recieve Header Data, file name and file size from server
+    #recieve Header Data, file name and file size from server (2)
     headerBinary, addr = s.recvfrom(bufferSize)
     headerInfo = headerBinary.decode()
     fileName, fileSize, fileHash = headerInfo.split(seperator)
+    
+    if(int(fileSize) == -1):
+        print(f"Server does not contain requested file {fileName}")
+        return
 
     print(f"Recieving {fileName} size of {fileSize}")
     filePath = os.path.join(fullPath,fileName)
@@ -99,7 +128,7 @@ def GetFile(fileName):
     #send acknowledgement that setup is complete
     s.sendto("recieved".encode(), addr)
 
-    progress = tqdm.tqdm(range(int(fileSize)), f"Recieving {fileName}", unit="B", unit_scale=True, unit_divisor=1024)
+    #progress = tqdm.tqdm(range(int(fileSize)), f"Recieving {fileName}", unit="B", unit_scale=True, unit_divisor=1024)
     
     with open(filePath, "wb") as f:
         while True:
@@ -110,7 +139,11 @@ def GetFile(fileName):
             f.write(bytes_read)
             
             writtenFileSize = writtenFileSize + len(bytes_read)
-            progress.update(len(bytes_read))
+            
+            #send acknowledgement
+            s.sendto(f"buffer received{writtenFileSize}".encode(),serverAddr)
+            
+            # progress.update(len(bytes_read))
             if writtenFileSize >= int(fileSize):    
                 # nothing is received
                 # file transmitting is done
